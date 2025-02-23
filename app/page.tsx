@@ -1,11 +1,11 @@
-import { LoginButton } from "@/components/login-button"
-import { LanguageSwitch } from "@/components/language-switch"
-import { getServerSession } from "next-auth"
-import { authOptions } from "./api/auth/[...nextauth]/route"
-import { GameInterface } from "@/components/game-interface"
+import { LoginButton } from "@/components/login-button";
+import { LanguageSwitch } from "@/components/language-switch";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { GameInterface } from "@/components/game-interface";
 
 export default async function Home() {
-  const session = await getServerSession(authOptions)
+  const session = await getServerSession(authOptions);
 
   return (
     <main className="min-h-screen p-4 md:p-8">
@@ -23,15 +23,17 @@ export default async function Home() {
           <GameInterface />
         ) : (
           <div className="text-center py-20">
-            <h2 className="text-2xl font-semibold mb-4">Velkommen til AI Bilde Spill!</h2>
+            <h2 className="text-2xl font-semibold mb-4">
+              Velkommen til AI Bilde Spill!
+            </h2>
             <p className="text-muted-foreground mb-8">
-              Logg inn for å begynne å lære og ha det gøy med AI-genererte bilder.
+              Logg inn for å begynne å lære og ha det gøy med AI-genererte
+              bilder.
             </p>
             <LoginButton session={session} />
           </div>
         )}
       </div>
     </main>
-  )
+  );
 }
-
