@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-
 import { createContext, useContext, useState } from "react";
 
 type Language = "no" | "en";
@@ -14,7 +13,7 @@ type LanguageContextType = {
 
 const translations = {
   no: {
-    welcome: "Velkommen til AI Bilde Spill!",
+    welcome: "Velkommen til AI Bilde-spill!",
     login: "Logg inn",
     logout: "Logg ut",
     start: "Start Spill",
@@ -34,6 +33,7 @@ const translations = {
     bestScore: "Beste poengsum",
     totalAttempts: "Totale forsøk",
     next: "Neste Bilde",
+    timeoutError: "Forespørselen tok for lang tid. Vennligst prøv igjen.", // Added timeout error message
   },
   en: {
     welcome: "Welcome to AI Image Game!",
@@ -57,6 +57,7 @@ const translations = {
     bestScore: "Best score",
     totalAttempts: "Total attempts",
     next: "Next Picture",
+    timeoutError: "Request timed out. Please try again.", // Added timeout error message
   },
 };
 

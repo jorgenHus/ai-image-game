@@ -9,6 +9,8 @@ import Image from "next/image";
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
+const FETCH_TIMEOUT = 60000; // 60 seconds
+
 export function GameInterface() {
   const { t, language } = useLanguage();
   const [gameStarted, setGameStarted] = useState(false);
@@ -21,10 +23,40 @@ export function GameInterface() {
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [bestScore, setBestScore] = useState(0);
 
+  const fetchWithTimeout = async (url: string, options: RequestInit) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(
+          t("timeoutError") || "Request timed out. Please try again."
+        );
+      }
+      throw error;
+    }
+  };
+
   const startGame = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/generate", {
+      const data = await fetchWithTimeout("/api/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -35,20 +67,17 @@ export function GameInterface() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
       setTargetImage(data.url);
       setTargetPrompt(data.prompt);
       setGameStarted(true);
       setGeneratedImage("");
       setPrompt("");
       setScore(null);
-    } catch (err) {
-      console.error("Failed to start game:", err);
-      toast.error(t("errorGenerating"));
+    } catch (error) {
+      console.error("Failed to start game:", error);
+      toast.error(
+        error instanceof Error ? error.message : t("errorGenerating")
+      );
     } finally {
       setLoading(false);
     }
@@ -56,9 +85,7 @@ export function GameInterface() {
 
   const nextPicture = async () => {
     if (score !== null) {
-      // Save the current score if needed
       setBestScore((prev) => Math.max(prev, score));
-      // Start new round
       await startGame();
     }
   };
@@ -67,8 +94,7 @@ export function GameInterface() {
     if (!prompt) return;
     setLoading(true);
     try {
-      // Generate image
-      const response = await fetch("/api/generate", {
+      const data = await fetchWithTimeout("/api/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -79,18 +105,12 @@ export function GameInterface() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
       setGeneratedImage(data.url);
 
       // Add a small delay to ensure the image is available
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Compare images
-      const compareResponse = await fetch("/api/compare", {
+      const { score, error } = await fetchWithTimeout("/api/compare", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,22 +121,14 @@ export function GameInterface() {
         }),
       });
 
-      if (!compareResponse.ok) {
-        throw new Error("Failed to compare images");
-      }
-
-      const { score, error } = await compareResponse.json();
-
       if (error) {
         throw new Error(error);
       }
 
-      // Update score and stats
       setScore(score);
       setTotalAttempts((prev) => prev + 1);
       setBestScore((prev) => Math.max(prev, score));
 
-      // Show feedback based on score
       if (score > 80) {
         toast.success(t("greatScore"));
       } else if (score > 60) {
@@ -124,9 +136,11 @@ export function GameInterface() {
       } else {
         toast(t("tryAgainScore"));
       }
-    } catch (err) {
-      console.error("Failed to generate or compare image:", err);
-      toast.error(t("errorGenerating"));
+    } catch (error) {
+      console.error("Failed to generate or compare image:", error);
+      toast.error(
+        error instanceof Error ? error.message : t("errorGenerating")
+      );
     } finally {
       setLoading(false);
     }

@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
+export const maxDuration = 60;
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// List of prompts in both languages
+// Define error types
+type OpenAIError = {
+  name: string;
+  message: string;
+  status?: number;
+};
+
 const prompts = {
   no: [
     "En søt kattunge som leker med et garnnøste",
@@ -25,41 +33,57 @@ const prompts = {
 
 export async function POST(req: Request) {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
     const { prompt, mode } = await req.json();
 
+    let imagePrompt: string;
     if (mode === "random") {
-      // Get a random prompt based on language
       const language = prompt as "no" | "en";
       const promptList = prompts[language];
-      const randomPrompt =
-        promptList[Math.floor(Math.random() * promptList.length)];
-
-      const response = await openai.images.generate({
-        model: "dall-e-3",
-        prompt: randomPrompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "standard",
-      });
-
-      return NextResponse.json({
-        url: response.data[0].url,
-        prompt: randomPrompt,
-      });
+      imagePrompt = promptList[Math.floor(Math.random() * promptList.length)];
     } else {
-      // Generate image from user prompt
-      const response = await openai.images.generate({
+      imagePrompt = prompt as string;
+    }
+
+    const response = await openai.images.generate(
+      {
         model: "dall-e-3",
-        prompt: prompt as string,
+        prompt: imagePrompt,
         n: 1,
         size: "1024x1024",
         quality: "standard",
-      });
+      },
+      {
+        signal: controller.signal,
+      }
+    );
 
-      return NextResponse.json({ url: response.data[0].url });
+    clearTimeout(timeoutId);
+
+    return NextResponse.json(
+      mode === "random"
+        ? { url: response.data[0].url, prompt: imagePrompt }
+        : { url: response.data[0].url }
+    );
+  } catch (error: unknown) {
+    // Type guard for error handling
+    const err = error as OpenAIError;
+    console.error("Error generating image:", err);
+
+    if (err.name === "AbortError") {
+      return NextResponse.json(
+        { error: "Request timed out. Please try again." },
+        { status: 504 }
+      );
     }
-  } catch (error) {
-    console.error("Error generating image:", error);
+
+    // Handle OpenAI API errors with status codes
+    if (err.status) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+
     return NextResponse.json(
       { error: "Failed to generate image" },
       { status: 500 }
